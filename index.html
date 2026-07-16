@@ -250,18 +250,50 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
 
   // ── 배당반영 계산 ──
   function odKey(n){ return CUR.d+'|'+CUR.r+'|'+n; }
+  // 순위 = 모델점수(30%) base + 연승 배당(55%, 주력) + 단승 배당(15%, 보조)
+  //  · 각 요소를 경주 내 z-점수(표준화)로 환산해 합산 → 스케일이 달라도 30% 모델이 실제로 순위를 움직임
+  //  · 배당은 1/배당(내재확률)으로 환산. 연승 없고 단승만 있으면 단승이 주력 승격, 둘 다 없으면 계산 안 함
+  var W_MODEL=0.30, W_PLC=0.55, W_WIN=0.15;
+  function zscores(vals){
+    var pres=vals.filter(function(v){return v!=null;});
+    if(!pres.length) return vals.map(function(){return 0;});
+    var mean=pres.reduce(function(s,v){return s+v;},0)/pres.length;
+    var sd=Math.sqrt(pres.reduce(function(s,v){return s+(v-mean)*(v-mean);},0)/pres.length);
+    return vals.map(function(v){ return (v==null||!sd)?0:(v-mean)/sd; });
+  }
   function compute(race){
-    var od=OD[odKey(race.n)]||{};
-    var withWin=race.h.map(function(a){return {num:a[0],win:(od[a[0]]&&od[a[0]].w)||null};}).filter(function(x){return x.win&&x.win>0;});
-    if(withWin.length<3) return null;
-    var s=0; withWin.forEach(function(x){x.inv=1/x.win;s+=x.inv;});
-    var mprob={}, ranked=withWin.slice().sort(function(a,b){return a.win-b.win;});
-    ranked.forEach(function(x,i){ mprob[x.num]={pct:Math.round(1000*x.inv/s)/10,rank:i+1}; });
+    var od=OD[odKey(race.n)]||{}, H=race.h;
+    var pCnt=0,wCnt=0;
+    H.forEach(function(a){ var o=od[a[0]]; if(o&&o.p>0)pCnt++; if(o&&o.w>0)wCnt++; });
+    var hasP=pCnt>=3, hasW=wCnt>=3;
+    if(!hasP&&!hasW) return null;
+    var useP=hasP;                       // 연승 우선(없으면 단승)로 '시장' 정의
+    var cand=H.filter(function(a){ var o=od[a[0]]; return useP?(o&&o.p>0):(o&&o.w>0); });
+    if(cand.length<3) return null;
+    var wm,wp,ww;
+    if(hasP&&hasW){ wm=W_MODEL; wp=W_PLC; ww=W_WIN; }
+    else if(hasP){ wm=W_MODEL; wp=W_PLC+W_WIN; ww=0; }
+    else { wm=W_MODEL; wp=0; ww=W_PLC+W_WIN; }
+    var mVals=cand.map(function(a){return a[2]>0?a[2]:0;});
+    var pVals=cand.map(function(a){var o=od[a[0]]; return (o&&o.p>0)?(1/o.p):null;});
+    var wVals=cand.map(function(a){var o=od[a[0]]; return (o&&o.w>0)?(1/o.w):null;});
+    var zM=zscores(mVals), zP=zscores(pVals), zW=zscores(wVals);
+    var sumMk=0; cand.forEach(function(a){var o=od[a[0]]; sumMk += useP?(o&&o.p>0?1/o.p:0):(o&&o.w>0?1/o.w:0);}); if(sumMk<=0)sumMk=1;
+    var arr=cand.map(function(a,i){
+      var o=od[a[0]]||{}, mkv=useP?(o.p>0?1/o.p:0):(o.w>0?1/o.w:0);
+      return {num:a[0], fin:wm*zM[i]+wp*zP[i]+ww*zW[i], mkt:mkv/sumMk, mkv:mkv};
+    });
+    var ranked=arr.slice().sort(function(a,b){return b.fin-a.fin;});
+    var mprob={}; ranked.forEach(function(x,i){ mprob[x.num]={pct:Math.round(x.mkt*1000)/10, rank:i+1}; });
     var top3=ranked.slice(0,3).map(function(x){return x.num;}), dh=ranked.slice(3,6).map(function(x){return x.num;});
+    // 어긋남: 모델 3픽 vs '순수 시장'(연승 우선) top3 — 모델·시장 괴리 신호 유지
+    var mkt=arr.slice().sort(function(a,b){return b.mkv-a.mkv;});
+    var mrank={}; mkt.forEach(function(x,i){ mrank[x.num]=i+1; });
+    var mktTop3=mkt.slice(0,3).map(function(x){return x.num;});
     var dis=null;
     if(race.p&&race.p[0]!=null){
-      var my=race.p.filter(function(x){return x!=null;}), ov=my.filter(function(n){return top3.indexOf(n)>=0;}).length;
-      var axr=(mprob[race.p[0]]||{}).rank||null, lv,msg;
+      var my=race.p.filter(function(x){return x!=null;}), ov=my.filter(function(n){return mktTop3.indexOf(n)>=0;}).length;
+      var axr=mrank[race.p[0]]||null, lv,msg;
       if(ov>=2&&axr&&axr<=3){lv='ok';msg='내 3픽이 시장 상위와 일치 — 신뢰';}
       else if(ov===1||(axr&&axr<=4)){lv='warn';msg='3픽 중 '+ov+'두만 시장 top3 — conf ↓·스윙 주의';}
       else {lv='danger';msg='축 시장 '+(axr||'?')+'위·겹침 '+ov+' — 시장이 축을 낮게 봄, 관망 권고';}
@@ -273,7 +305,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   function summaryHtml(c){
     var warn = c&&c.dis
       ? '<div class="warn-line sw-'+c.dis.lv+'">'+({ok:'✅ 일치',warn:'⚠️ 주의',danger:'⛔ 경고'}[c.dis.lv])+' · '+c.dis.msg+'</div>'
-      : '<div class="warn-line sw-none">단승 배당을 입력하면 추천·복병·어긋남이 계산됩니다</div>';
+      : '<div class="warn-line sw-none">연승·단승 배당을 입력하면 순위가 재배치됩니다 (연승 주력 + 모델 보정)</div>';
     var picks = c ? '<div class="picks">'
       + c.top3.map(function(n){return '<span class="pill top"><span class="lbl">추천</span>'+n+'</span>';}).join('')
       + c.dh.map(function(n){return '<span class="pill dh"><span class="lbl">복병</span>'+n+'</span>';}).join('')+'</div>' : '';
@@ -289,7 +321,10 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     var top3=(c&&c.top3)||[], dh=(c&&c.dh)||[], tset={}, dset={};
     top3.forEach(function(n){tset[n]=1;}); dh.forEach(function(n){dset[n]=1;});
     var od=OD[odKey(race.n)]||{};
-    var horses=race.h.slice().sort(function(a,b){return b[2]-a[2];});
+    var horses=race.h.slice().sort(function(a,b){
+      var ra=(c&&c.mprob[a[0]])?c.mprob[a[0]].rank:999, rb=(c&&c.mprob[b[0]])?c.mprob[b[0]].rank:999;
+      return (ra!==rb)?(ra-rb):(b[2]-a[2]);   // 배당 있으면 최종순위, 없으면 모델점수 순
+    });
     var rowsHtml=horses.map(function(a){
       var num=a[0],nm=a[1],sc=a[2], mp=c&&c.mprob[num];
       var cls=tset[num]?'top':dset[num]?'dh':'';
