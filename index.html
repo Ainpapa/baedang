@@ -65,6 +65,13 @@
   .row .odd{width:52px} .row .odd input{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--card-2);color:var(--text);padding:8px 3px;text-align:center;font-family:var(--font-mono);font-size:16px;font-weight:700}
   .row .odd input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
   .oh{display:flex;gap:7px;justify-content:flex-end;padding:0 11px 4px;color:var(--muted);font-size:10px;font-weight:800} .oh span{width:52px;text-align:center}
+  .btn.ghost.on{background:var(--accent);color:#1a1206;border-color:transparent}
+  .wpanel{background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:11px 13px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .wtit{font-size:12px;font-weight:800;margin-bottom:9px} .wtit .wsub{color:var(--dim);font-weight:600;font-size:10px;margin-left:4px}
+  .wrow{display:flex;align-items:center;gap:10px;margin:7px 0}
+  .wlab{width:34px;font-size:12px;font-weight:800;color:var(--muted);flex:none}
+  .wrow input[type=range]{flex:1;min-width:0;accent-color:var(--accent);height:24px}
+  .wval{width:40px;text-align:right;font-family:var(--font-mono);font-size:13px;font-weight:800;color:var(--accent);flex:none}
   .foot{color:var(--dim);font-size:10.5px;text-align:center;margin-top:20px;line-height:1.7}
 </style>
 
@@ -105,6 +112,12 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   }
   function jget(k){ try{return JSON.parse(rawGet(k)||'{}');}catch(e){return {};} }
   function jset(k,v){ rawSet(k,JSON.stringify(v)); }
+
+  // 순위 비중(사용자 조절·저장). 상대값이면 됨(정규화는 z-score라 절대 스케일 무관)
+  var LS_W='baedang_w';
+  function loadWeights(){ try{ var o=JSON.parse(rawGet(LS_W)||'null'); if(o&&isFinite(o.m)&&isFinite(o.p)&&isFinite(o.w)&&(o.m+o.p+o.w)>0) return {m:+o.m,p:+o.p,w:+o.w}; }catch(e){} return {m:30,p:62,w:8}; }
+  var WEIGHTS=loadWeights();
+  function saveWeights(){ rawSet(LS_W,JSON.stringify(WEIGHTS)); }
   function b64uDec(s){ try{ s=s.replace(/-/g,'+').replace(/_/g,'/'); return decodeURIComponent(escape(atob(s))); }catch(e){ return null; } }
   function b64uEnc(str){ try{ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }catch(e){ return ''; } }
 
@@ -120,7 +133,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   }
 
   var LIB=jget(LS_LIB), OD=jget(LS_OD);   // LIB["d|r"]={d,r,races}  OD["d|r|no"]={num:{w,p}}
-  var CUR=null, page=0;
+  var CUR=null, page=0, showW=false;
 
   // ── 저장: localStorage/sessionStorage + URL 해시(3중 저장, 하나라도 남으면 새로고침 시 복원) ──
   function saveState(){
@@ -250,10 +263,9 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
 
   // ── 배당반영 계산 ──
   function odKey(n){ return CUR.d+'|'+CUR.r+'|'+n; }
-  // 순위 = 모델점수(30%) base + 연승 배당(55%, 주력) + 단승 배당(15%, 보조)
-  //  · 각 요소를 경주 내 z-점수(표준화)로 환산해 합산 → 스케일이 달라도 30% 모델이 실제로 순위를 움직임
+  // 순위 = 모델점수 base + 연승 배당(주력) + 단승 배당(보조). 비중은 WEIGHTS(사용자 슬라이더로 조절·저장)
+  //  · 각 요소를 경주 내 z-점수(표준화)로 환산해 합산 → 스케일이 달라도 모델이 실제로 순위를 움직임
   //  · 배당은 1/배당(내재확률)으로 환산. 연승 없고 단승만 있으면 단승이 주력 승격, 둘 다 없으면 계산 안 함
-  var W_MODEL=0.30, W_PLC=0.55, W_WIN=0.15;
   function zscores(vals){
     var pres=vals.filter(function(v){return v!=null;});
     if(!pres.length) return vals.map(function(){return 0;});
@@ -270,10 +282,10 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     var useP=hasP;                       // 연승 우선(없으면 단승)로 '시장' 정의
     var cand=H.filter(function(a){ var o=od[a[0]]; return useP?(o&&o.p>0):(o&&o.w>0); });
     if(cand.length<3) return null;
-    var wm,wp,ww;
-    if(hasP&&hasW){ wm=W_MODEL; wp=W_PLC; ww=W_WIN; }
-    else if(hasP){ wm=W_MODEL; wp=W_PLC+W_WIN; ww=0; }
-    else { wm=W_MODEL; wp=0; ww=W_PLC+W_WIN; }
+    var Wm=WEIGHTS.m, Wp=WEIGHTS.p, Ww=WEIGHTS.w, wm,wp,ww;
+    if(hasP&&hasW){ wm=Wm; wp=Wp; ww=Ww; }
+    else if(hasP){ wm=Wm; wp=Wp+Ww; ww=0; }
+    else { wm=Wm; wp=0; ww=Wp+Ww; }
     var mVals=cand.map(function(a){return a[2]>0?a[2]:0;});
     var pVals=cand.map(function(a){var o=od[a[0]]; return (o&&o.p>0)?(1/o.p):null;});
     var wVals=cand.map(function(a){var o=od[a[0]]; return (o&&o.w>0)?(1/o.w):null;});
@@ -312,6 +324,17 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     return warn+picks;
   }
 
+  // ⚙️ 순위 비중 조절 패널
+  function weightPanelHtml(){
+    if(!showW) return '';
+    var t=WEIGHTS.m+WEIGHTS.p+WEIGHTS.w; if(t<=0)t=1;
+    function rw(k,lab){ var v=WEIGHTS[k];
+      return '<div class="wrow"><span class="wlab">'+lab+'</span><input type="range" min="0" max="100" step="1" value="'+v+'" data-wk="'+k+'"><span class="wval" id="wv-'+k+'">'+Math.round(v/t*100)+'%</span></div>'; }
+    return '<div class="wpanel"><div class="wtit">순위 비중 조절 <span class="wsub">드래그하면 순위에 바로 반영·저장</span></div>'
+      +rw('m','모델')+rw('p','연승')+rw('w','단승')
+      +'<button class="btn ghost sm" id="wreset" style="margin-top:8px">기본값 (모델30·연승62·단승8)</button></div>';
+  }
+
   function render(){
     if(!CUR){ renderHome(); return; }
     var races=CUR.races||[]; if(!races.length){ renderHome(); return; }
@@ -338,13 +361,27 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     }).join('');
     $('#app').innerHTML=
       '<div class="pager"><div class="pg">'+CUR.r+' '+CUR.d+' · '+(page+1)+'/'+races.length+'경주</div>'
-      +'<div class="nav"><button class="btn ghost sm" id="home">≡ 목록</button><button class="btn ghost sm" id="prev">‹</button><button class="btn ghost sm" id="next">›</button></div></div>'
+      +'<div class="nav"><button class="btn ghost sm" id="home">≡ 목록</button><button class="btn ghost sm" id="prev">‹</button><button class="btn ghost sm" id="next">›</button><button class="btn ghost sm'+(showW?' on':'')+'" id="wtoggle">⚙️</button></div></div>'
+      +weightPanelHtml()
       +'<div class="rhead"><b>'+race.n+'R</b><span class="g">'+(race.g||'')+'</span><span class="t">'+(race.tl||'')+'</span></div>'
       +'<div class="summary">'+summaryHtml(c)+'</div>'
       +'<div class="oh"><span>단승</span><span>연승</span></div><div class="rows">'+rowsHtml+'</div>';
     $('#home').onclick=renderHome;
     $('#prev').onclick=function(){ if(page>0){page--;render();} };
     $('#next').onclick=function(){ if(page<races.length-1){page++;render();} };
+    var wt=$('#wtoggle'); if(wt) wt.onclick=function(){ showW=!showW; render(); };
+    if(showW){
+      Array.prototype.forEach.call(document.querySelectorAll('input[data-wk]'),function(sl){
+        sl.oninput=function(){
+          WEIGHTS[sl.dataset.wk]=+sl.value||0; saveWeights();
+          var t=WEIGHTS.m+WEIGHTS.p+WEIGHTS.w; if(t<=0)t=1;
+          ['m','p','w'].forEach(function(k){ var el=$('#wv-'+k); if(el) el.textContent=Math.round(WEIGHTS[k]/t*100)+'%'; });
+          updateLive(race);
+        };
+        sl.onchange=function(){ render(); };   // 손 떼면 행 순서까지 재정렬
+      });
+      var wr=$('#wreset'); if(wr) wr.onclick=function(){ WEIGHTS={m:30,p:62,w:8}; saveWeights(); render(); };
+    }
     Array.prototype.forEach.call(document.querySelectorAll('.odd input'),function(inp){
       inp.addEventListener('input',function(){
         var n=+inp.dataset.n, k=inp.dataset.k, v=parseFloat(inp.value), id=odKey(race.n);
