@@ -61,6 +61,10 @@
   .row .no{min-width:20px;text-align:center;font-family:var(--font-mono);font-weight:800;color:var(--accent)}
   .row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
   .row .nm small{color:var(--dim);font-size:10.5px;margin-left:5px}
+  .row .nm small .spd{font-family:var(--font-mono);font-weight:800;margin:0 2px}
+  .row .nm small .spd.fast{color:var(--ok)} .row .nm small .spd.slow{color:var(--dim)}
+  .row .nm small .spd.t{color:var(--dh)} .row .nm small .spd.x{color:var(--warn)} .row .nm small .spd.none{color:var(--dim);font-weight:600}
+  .rhead .d{color:var(--muted);font-size:11px;font-weight:700}
   .row .fin{font-size:10px;font-weight:800;color:#fff;background:var(--dim);border-radius:5px;padding:1px 5px;margin-left:4px}
   .row .odd{width:52px} .row .odd input{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--card-2);color:var(--text);padding:8px 3px;text-align:center;font-family:var(--font-mono);font-size:16px;font-weight:700}
   .row .odd input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
@@ -170,13 +174,21 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     try{
       var m=(location.hash||'').match(/[#&]s=([^&]+)/); if(!m) return false;
       var o=decodeCode(m[1]); if(!o) return false;
-      if(o.L&&typeof o.L==='object'){ LIB=o.L; if(o.O&&typeof o.O==='object') OD=o.O; return true; }
-      if(applyBlocks(o)) return true;
+      if(o.L&&typeof o.L==='object'){
+        // ⚠️병합(덮어쓰기 금지): 홈화면 아이콘·북마크는 예전 해시(옛 코드)를 물고 있어, 그대로 두면
+        //   localStorage에 저장된 '최근 코드'를 옛 코드로 덮어써 사라짐 → localStorage(최신)를 우선하고 해시엔만 있는 것만 추가.
+        var added=false;
+        Object.keys(o.L).forEach(function(k){ if(!LIB[k]){ LIB[k]=o.L[k]; added=true; } });
+        if(o.O&&typeof o.O==='object'){ Object.keys(o.O).forEach(function(k){ if(!OD[k]){ OD[k]=o.O[k]; added=true; } }); }
+        return added;
+      }
+      if(applyBlocks(o)) return true;   // 노트북 공유코드({blocks}) — applyBlocks는 병합(같은 개최는 갱신)
     }catch(e){}
     return false;
   }
-  if(loadHash()){ saveState(); }
-  if(!Object.keys(LIB).length){ if(loadWinName()) saveState(); }
+  loadHash();                                    // localStorage + 해시 병합(덮어쓰기 안 함)
+  if(!Object.keys(LIB).length){ loadWinName(); }  // 둘 다 비면 window.name 복원
+  if(Object.keys(LIB).length){ saveState(); }     // 병합 결과를 모든 저장소·현재 URL에 최신 상태로 재기록
 
   var DEMO={d:'2026-07-11',r:'서울(데모)',races:[
     {n:3,g:'국6등급',tl:'실전(5·4·3등급)',
@@ -348,14 +360,21 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       var ra=(c&&c.mprob[a[0]])?c.mprob[a[0]].rank:999, rb=(c&&c.mprob[b[0]])?c.mprob[b[0]].rank:999;
       return (ra!==rb)?(ra-rb):(b[2]-a[2]);   // 배당 있으면 최종순위, 없으면 모델점수 순
     });
+    var rp=(race.rp!=null?race.rp:null);   // 이 경주 기준 100m 속도
     var rowsHtml=horses.map(function(a){
-      var num=a[0],nm=a[1],sc=a[2], mp=c&&c.mprob[num];
+      var num=a[0],nm=a[1],sc=a[2], pace=(a.length>3?a[3]:null), psrc=(a.length>4?a[4]:''), mp=c&&c.mprob[num];
       var cls=tset[num]?'top':dset[num]?'dh':'';
       var fin=finRank[num]?'<span class="fin">'+finRank[num]+'착</span>':'';
       var wv=(od[num]&&od[num].w!=null)?od[num].w:'', pv=(od[num]&&od[num].p!=null)?od[num].p:'';
       var pct=mp?' '+mp.pct+'%':'';
+      var spd='';   // 실측 100m 속도(초): 기준보다 빠르면 초록·느리면 흐림 / 심=주행심사 / ≈=다른거리대체 / 기록없음
+      if(pace!=null){
+        if(psrc==='t') spd=' <b class="spd t">'+pace.toFixed(2)+'심</b>';
+        else if(psrc==='x') spd=' <b class="spd x">≈'+pace.toFixed(2)+'</b>';
+        else spd=' <b class="spd'+(rp!=null?(pace<=rp?' fast':' slow'):'')+'">'+pace.toFixed(2)+'</b>';
+      } else if(psrc==='n'){ spd=' <b class="spd none">기록없음</b>'; }
       return '<div class="row '+cls+'" data-n="'+num+'"><span class="mrk">'+(mp?mp.rank:'')+'</span>'
-        +'<span class="no">'+num+'</span><span class="nm">'+nm+fin+'<small>모델'+sc+pct+'</small></span>'
+        +'<span class="no">'+num+'</span><span class="nm">'+nm+fin+'<small>모델'+sc+spd+'<span class="pctv">'+pct+'</span></small></span>'
         +'<span class="odd"><input inputmode="decimal" data-k="w" data-n="'+num+'" value="'+wv+'" placeholder="단"></span>'
         +'<span class="odd"><input inputmode="decimal" data-k="p" data-n="'+num+'" value="'+pv+'" placeholder="연"></span></div>';
     }).join('');
@@ -363,7 +382,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       '<div class="pager"><div class="pg">'+CUR.r+' '+CUR.d+' · '+(page+1)+'/'+races.length+'경주</div>'
       +'<div class="nav"><button class="btn ghost sm" id="home">≡ 목록</button><button class="btn ghost sm" id="prev">‹</button><button class="btn ghost sm" id="next">›</button><button class="btn ghost sm'+(showW?' on':'')+'" id="wtoggle">⚙️</button></div></div>'
       +weightPanelHtml()
-      +'<div class="rhead"><b>'+race.n+'R</b><span class="g">'+(race.g||'')+'</span><span class="t">'+(race.tl||'')+'</span></div>'
+      +'<div class="rhead"><b>'+race.n+'R</b><span class="g">'+(race.g||'')+'</span>'+((race.dist||race.bl)?'<span class="d">'+(race.dist?race.dist+'m ':'')+(race.bl||'')+(rp!=null?' · 기준'+rp.toFixed(2):'')+'</span>':'')+'<span class="t">'+(race.tl||'')+'</span></div>'
       +'<div class="summary">'+summaryHtml(c)+'</div>'
       +'<div class="oh"><span>단승</span><span>연승</span></div><div class="rows">'+rowsHtml+'</div>';
     $('#home').onclick=renderHome;
@@ -399,8 +418,8 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       var n=+row.dataset.n; row.classList.remove('top','dh');
       if(tset[n])row.classList.add('top'); else if(dset[n])row.classList.add('dh');
       var mrk=$('.mrk',row); if(mrk) mrk.textContent=(c&&c.mprob[n])?c.mprob[n].rank:'';
-      var small=$('.nm small',row);
-      if(small){ var base=small.textContent.replace(/\s\d+(\.\d+)?%$/,''); var mp=c&&c.mprob[n]; small.textContent=mp?base+' '+mp.pct+'%':base; }
+      var pctv=$('.nm small .pctv',row);   // %만 갱신(속도 <b> 서식 보존)
+      if(pctv){ var mp=c&&c.mprob[n]; pctv.textContent=mp?' '+mp.pct+'%':''; }
     });
   }
 
