@@ -151,15 +151,18 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   var LIB=jget(LS_LIB), OD=jget(LS_OD);   // LIB["d|r"]={d,r,races}  OD["d|r|no"]={num:{w,p}}
   var CUR=null, page=0, showW=false;
 
-  // ── 저장: localStorage/sessionStorage + URL 해시(3중 저장, 하나라도 남으면 새로고침 시 복원) ──
+  // ── 저장: localStorage + window.name (2중). 주소(해시)엔 데이터를 싣지 않음 ──
+  //  ⚠️2026-08-07 변경: 예전엔 {L,O} 전체를 base64로 주소에 복사해 넣었음(3중 저장). 개최가 쌓일수록
+  //    주소가 끝없이 길어져 12개최·100경주에서 55,000자에 달했음. lz-string으로 압축해도 15,000자라
+  //    근본 해결이 아니어서 아예 싣지 않기로 함. 데이터는 localStorage(영구) + window.name(같은 탭)에 남음.
+  //  · 받은 공유링크(#s=…)는 loadHash()가 읽어 들인 직후 여기서 주소를 깨끗이 지움.
+  //  · 되돌리려면 아래 replaceState의 base 뒤에 압축 해시를 다시 붙이면 됨(decodeCode가 'L1'을 이미 해독).
   function saveState(){
     jset(LS_LIB,LIB); jset(LS_OD,OD);
     var payload = JSON.stringify({L:LIB,O:OD});
-    var enc = Object.keys(LIB).length ? b64uEnc(payload) : '';
-    var base = location.pathname + location.search;
-    try{ history.replaceState(null,'', base + (enc?('#s='+enc):'')); }
-    catch(e){ try{ location.hash = enc?('s='+enc):''; }catch(e2){} }
-    // window.name = 같은 탭에서 새로고침/재실행에도 잘 살아남는 저장(샌드박스 스토리지가 비워질 때 대비)
+    try{ history.replaceState(null,'', location.pathname + location.search); }
+    catch(e){ try{ location.hash=''; }catch(e2){} }
+    // window.name = 같은 탭에서 새로고침/재실행에도 잘 살아남는 저장(스토리지가 비워질 때 대비)
     try{ window.name = Object.keys(LIB).length ? ('BAEDANG1:'+payload) : ''; }catch(e){}
   }
   // window.name에 저장된 상태 복원
