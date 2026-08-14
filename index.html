@@ -73,23 +73,17 @@
   .row .nm small .spd.t{color:var(--dh)} .row .nm small .spd.x{color:var(--warn)} .row .nm small .spd.none{color:var(--dim);font-weight:600}
   .rhead .d{color:var(--muted);font-size:11px;font-weight:700}
   .row .fin{font-size:10px;font-weight:800;color:#fff;background:var(--dim);border-radius:5px;padding:1px 5px;margin-left:4px}
-  .row .odd{width:52px} .row .odd input{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--card-2);color:var(--text);padding:8px 3px;text-align:center;font-family:var(--font-mono);font-size:16px;font-weight:700}
-  .row .odd input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
-  .oh{display:flex;gap:7px;justify-content:flex-end;padding:0 11px 4px;color:var(--muted);font-size:10px;font-weight:800} .oh span{width:52px;text-align:center}
+  /* 후반 흐름 배지 — 🚀 후반 추월(추입) / 🔻 후반 추월당함(밀림) */
+  .row .sg{flex:none;font-size:13px;line-height:1}
   .btn.ghost.on{background:var(--accent);color:#1a1206;border-color:transparent}
-  .wpanel{background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:11px 13px;margin-bottom:10px;box-shadow:var(--shadow)}
-  .wtit{font-size:12px;font-weight:800;margin-bottom:9px} .wtit .wsub{color:var(--dim);font-weight:600;font-size:10px;margin-left:4px}
-  .wrow{display:flex;align-items:center;gap:10px;margin:7px 0}
-  .wlab{width:34px;font-size:12px;font-weight:800;color:var(--muted);flex:none}
-  .wrow input[type=range]{flex:1;min-width:0;accent-color:var(--accent);height:24px}
-  .wval{width:40px;text-align:right;font-family:var(--font-mono);font-size:13px;font-weight:800;color:var(--accent);flex:none}
+  /* 2026-08-15: 배당 입력칸(.odd)·단연 헤더(.oh)·비중 슬라이더(.wpanel/.wrow/…) CSS 제거 */
   .foot{color:var(--dim);font-size:10.5px;text-align:center;margin-top:20px;line-height:1.7}
 </style>
 
 <div class="wrap">
   <header><h1>배당반영</h1><span class="tag">경마 · 폰</span></header>
   <div id="app"></div>
-  <p class="foot">노트북 전략점수 → <b>📱 폰으로 전송</b>의 <b>링크</b>를 카톡으로 옮겨 탭하면, 그날 경주가 폰으로 들어옵니다 · <b>축·복연1·복연2</b>=노트북 Claude 추천 3두 · <b>복병</b>=Claude가 3착점수 4~9위에서 고른 2두(실측 706경주: 실제 3착마의 49.6%가 4위 이하 출신)</p>
+  <p class="foot">노트북에서 <b>📱 폰으로 전송</b>을 누르면 이 페이지를 열 때 자동으로 들어옵니다(안 보이면 <b>🔄 최신 받기</b>) · 목록은 <b>전략점수</b> 순 · <b>🚀</b>=후반 추월(추입·마무리형) / <b>🔻</b>=후반 추월당함(밀림) · <b>축·복연1·복연2</b>=노트북 Claude 추천 3두 · <b>복병</b>=Claude가 3착점수 4~9위에서 고른 2두(실측 706경주: 실제 3착마의 49.6%가 4위 이하 출신)</p>
 </div>
 
 <script>
@@ -105,7 +99,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     }
   }catch(e){}
   var $=function(s,el){return (el||document).querySelector(s);};
-  var LS_LIB='baedang_lib', LS_OD='baedang_od';
+  var LS_LIB='baedang_lib';   // 2026-08-15: 배당 손입력 제거 — LS_OD('baedang_od')·비중슬라이더는 폐지됨
 
   // ── 저장소: localStorage + sessionStorage 이중화(샌드박스에서 한쪽이 비워져도 다른 쪽이 살아남게) ──
   function rawGet(k){
@@ -120,11 +114,6 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   function jget(k){ try{return JSON.parse(rawGet(k)||'{}');}catch(e){return {};} }
   function jset(k,v){ rawSet(k,JSON.stringify(v)); }
 
-  // 순위 비중(사용자 조절·저장). 상대값이면 됨(정규화는 z-score라 절대 스케일 무관)
-  var LS_W='baedang_w';
-  function loadWeights(){ try{ var o=JSON.parse(rawGet(LS_W)||'null'); if(o&&isFinite(o.m)&&isFinite(o.p)&&isFinite(o.w)&&(o.m+o.p+o.w)>0) return {m:+o.m,p:+o.p,w:+o.w}; }catch(e){} return {m:30,p:62,w:8}; }
-  var WEIGHTS=loadWeights();
-  function saveWeights(){ rawSet(LS_W,JSON.stringify(WEIGHTS)); }
   function b64uDec(s){ try{ s=s.replace(/-/g,'+').replace(/_/g,'/'); return decodeURIComponent(escape(atob(s))); }catch(e){ return null; } }
   function b64uEnc(str){ try{ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }catch(e){ return ''; } }
 
@@ -155,8 +144,8 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     return null;
   }
 
-  var LIB=jget(LS_LIB), OD=jget(LS_OD);   // LIB["d|r"]={d,r,races}  OD["d|r|no"]={num:{w,p}}
-  var CUR=null, page=0, showW=false;
+  var LIB=jget(LS_LIB);   // LIB["d|r"]={d,r,races}
+  var CUR=null, page=0;
 
   // ── 저장: localStorage + window.name (2중). 주소(해시)엔 데이터를 싣지 않음 ──
   //  ⚠️2026-08-07 변경: 예전엔 {L,O} 전체를 base64로 주소에 복사해 넣었음(3중 저장). 개최가 쌓일수록
@@ -165,8 +154,8 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   //  · 받은 공유링크(#s=…)는 loadHash()가 읽어 들인 직후 여기서 주소를 깨끗이 지움.
   //  · 되돌리려면 아래 replaceState의 base 뒤에 압축 해시를 다시 붙이면 됨(decodeCode가 'L1'을 이미 해독).
   function saveState(){
-    jset(LS_LIB,LIB); jset(LS_OD,OD);
-    var payload = JSON.stringify({L:LIB,O:OD});
+    jset(LS_LIB,LIB);
+    var payload = JSON.stringify({L:LIB});
     try{ history.replaceState(null,'', location.pathname + location.search); }
     catch(e){ try{ location.hash=''; }catch(e2){} }
     // window.name = 같은 탭에서 새로고침/재실행에도 잘 살아남는 저장(스토리지가 비워질 때 대비)
@@ -178,7 +167,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       var s=window.name||'';
       if(s.indexOf('BAEDANG1:')!==0) return false;
       var o=JSON.parse(s.slice(9));
-      if(o&&o.L&&typeof o.L==='object'){ LIB=o.L; if(o.O&&typeof o.O==='object') OD=o.O; return Object.keys(LIB).length>0; }
+      if(o&&o.L&&typeof o.L==='object'){ LIB=o.L; return Object.keys(LIB).length>0; }   // 옛 저장본의 o.O(배당)는 무시
     }catch(e){}
     return false;
   }
@@ -201,8 +190,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
         //   localStorage에 저장된 '최근 코드'를 옛 코드로 덮어써 사라짐 → localStorage(최신)를 우선하고 해시엔만 있는 것만 추가.
         var added=false;
         Object.keys(o.L).forEach(function(k){ if(!LIB[k]){ LIB[k]=o.L[k]; added=true; } });
-        if(o.O&&typeof o.O==='object'){ Object.keys(o.O).forEach(function(k){ if(!OD[k]){ OD[k]=o.O[k]; added=true; } }); }
-        return added;
+        return added;   // 옛 링크의 o.O(배당)는 무시
       }
       if(applyBlocks(o)) return true;   // 노트북 공유코드({blocks}) — applyBlocks는 병합(같은 개최는 갱신)
     }catch(e){}
@@ -285,7 +273,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     $('#pull').onclick=function(){ pullNow(this); };
     $('#add').onclick=renderLoad;
     $('#demo').onclick=function(){ CUR=DEMO; page=0; render(); };
-    $('#clr').onclick=function(){ if(confirm('저장된 모든 개최일·입력을 지울까요?')){ LIB={}; OD={}; saveState(); renderHome(); } };
+    $('#clr').onclick=function(){ if(confirm('저장된 모든 개최일을 지울까요?')){ LIB={}; saveState(); renderHome(); } };
     document.querySelectorAll('.pick-meet').forEach(function(bn){ bn.onclick=function(){ CUR=LIB[bn.dataset.k]; page=0; render(); }; });
   }
 
@@ -312,127 +300,49 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     $('#demo').onclick=function(){ CUR=DEMO; page=0; render(); };
   }
 
-  // ── 배당반영 계산 ──
-  function odKey(n){ return CUR.d+'|'+CUR.r+'|'+n; }
-  // 순위 = 모델점수 base + 연승 배당(주력) + 단승 배당(보조). 비중은 WEIGHTS(사용자 슬라이더로 조절·저장)
-  //  · 각 요소를 경주 내 z-점수(표준화)로 환산해 합산 → 스케일이 달라도 모델이 실제로 순위를 움직임
-  //  · 배당은 1/배당(내재확률)으로 환산. 연승 없고 단승만 있으면 단승이 주력 승격, 둘 다 없으면 계산 안 함
-  function zscores(vals){
-    var pres=vals.filter(function(v){return v!=null;});
-    if(!pres.length) return vals.map(function(){return 0;});
-    var mean=pres.reduce(function(s,v){return s+v;},0)/pres.length;
-    var sd=Math.sqrt(pres.reduce(function(s,v){return s+(v-mean)*(v-mean);},0)/pres.length);
-    return vals.map(function(v){ return (v==null||!sd)?0:(v-mean)/sd; });
-  }
-  // Claude 픽(축·복연1·복연2 + 복병 2두) — 노트북 예측 결과. 배당 입력 여부와 무관하게 항상 표시.
+  // ── (2026-08-15) 배당 손입력 제거 ─────────────────────────────────────────
+  //  단승·연승 입력칸 / 비중 슬라이더 / 시장확률 재정렬 / 어긋남 경고를 모두 걷어냄.
+  //  이유: 557경주 확정배당 회수율 검증에서 배당 기반 재배치의 엣지가 확인되지 않았고
+  //        (100% 넘는 구간 없음), 경마장에서 매 경주 손으로 치는 품만 컸음.
+  //  축·복연1·복연2·복병은 원래 배당과 무관한 Claude 예측값이라 그대로 유지된다.
+  // Claude 픽(축·복연1·복연2 + 복병 2두) — 노트북 예측 결과. 이 화면의 유일한 추천 근거.
   function cpicks(race){
     var p=(race&&race.p)||[], b=(race&&race.bh)||[];
     var n=function(x){ return (x!=null&&x!=='')?Number(x):null; };
     return {ax:n(p[0]), y1:n(p[1]), y2:n(p[2]),
             bh:b.map(n).filter(function(x){return x!=null;})};
   }
-  function compute(race){
-    var od=OD[odKey(race.n)]||{}, H=race.h;
-    var pCnt=0,wCnt=0;
-    H.forEach(function(a){ var o=od[a[0]]; if(o&&o.p>0)pCnt++; if(o&&o.w>0)wCnt++; });
-    var hasP=pCnt>=3, hasW=wCnt>=3;
-    if(!hasP&&!hasW) return null;
-    var useP=hasP;                       // 연승 우선(없으면 단승)로 '시장' 정의
-    var cand=H.filter(function(a){ var o=od[a[0]]; return useP?(o&&o.p>0):(o&&o.w>0); });
-    if(cand.length<3) return null;
-    var Wm=WEIGHTS.m, Wp=WEIGHTS.p, Ww=WEIGHTS.w, wm,wp,ww;
-    if(hasP&&hasW){ wm=Wm; wp=Wp; ww=Ww; }
-    else if(hasP){ wm=Wm; wp=Wp+Ww; ww=0; }
-    else { wm=Wm; wp=0; ww=Wp+Ww; }
-    var mVals=cand.map(function(a){return a[2]>0?a[2]:0;});
-    var pVals=cand.map(function(a){var o=od[a[0]]; return (o&&o.p>0)?(1/o.p):null;});
-    var wVals=cand.map(function(a){var o=od[a[0]]; return (o&&o.w>0)?(1/o.w):null;});
-    var zM=zscores(mVals), zP=zscores(pVals), zW=zscores(wVals);
-    var sumMk=0; cand.forEach(function(a){var o=od[a[0]]; sumMk += useP?(o&&o.p>0?1/o.p:0):(o&&o.w>0?1/o.w:0);}); if(sumMk<=0)sumMk=1;
-    var arr=cand.map(function(a,i){
-      var o=od[a[0]]||{}, mkv=useP?(o.p>0?1/o.p:0):(o.w>0?1/o.w:0);
-      return {num:a[0], fin:wm*zM[i]+wp*zP[i]+ww*zW[i], mkt:mkv/sumMk, mkv:mkv};
-    });
-    var ranked=arr.slice().sort(function(a,b){return b.fin-a.fin;});
-    var mprob={}; ranked.forEach(function(x,i){ mprob[x.num]={pct:Math.round(x.mkt*1000)/10, rank:i+1}; });
-    var top3=ranked.slice(0,3).map(function(x){return x.num;}), dh=ranked.slice(3,6).map(function(x){return x.num;});
-    // 어긋남: 모델 3픽 vs '순수 시장'(연승 우선) top3 — 모델·시장 괴리 신호 유지
-    var mkt=arr.slice().sort(function(a,b){return b.mkv-a.mkv;});
-    var mrank={}; mkt.forEach(function(x,i){ mrank[x.num]=i+1; });
-    var mktTop3=mkt.slice(0,3).map(function(x){return x.num;});
-    var dis=null;
-    if(race.p&&race.p[0]!=null){
-      var my=race.p.filter(function(x){return x!=null;}), ov=my.filter(function(n){return mktTop3.indexOf(n)>=0;}).length;
-      var axr=mrank[race.p[0]]||null, lv,msg;
-      if(ov>=2&&axr&&axr<=3){lv='ok';msg='내 3픽이 시장 상위와 일치 — 신뢰';}
-      else if(ov===1||(axr&&axr<=4)){lv='warn';msg='3픽 중 '+ov+'두만 시장 top3 — conf ↓·스윙 주의';}
-      else {lv='danger';msg='축 시장 '+(axr||'?')+'위·겹침 '+ov+' — 시장이 축을 낮게 봄, 관망 권고';}
-      if(axr===1&&lv!=='ok'){lv='warn';msg='축이 시장 1위 — 축은 안전, 복연 짝만 주의';}
-      dis={lv:lv,msg:msg};
-    }
-    return {mprob:mprob,top3:top3,dh:dh,dis:dis};
-  }
-  function summaryHtml(c, cp){
-    var warn = c&&c.dis
-      ? '<div class="warn-line sw-'+c.dis.lv+'">'+({ok:'✅ 일치',warn:'⚠️ 주의',danger:'⛔ 경고'}[c.dis.lv])+' · '+c.dis.msg+'</div>'
-      : '<div class="warn-line sw-none">연승·단승 배당을 입력하면 순위가 재배치됩니다 (연승 주력 + 모델 보정)</div>';
-    var picks='';
-    if(cp && cp.ax!=null){      // Claude 예측이 같이 온 경주 = 추천 3두 + 복병(배당 없어도 항상 표시)
-      picks='<div class="picks">'
-        +'<span class="pill top"><span class="lbl">축</span>'+cp.ax+'</span>'
-        +(cp.y1!=null?'<span class="pill y"><span class="lbl">복연1</span>'+cp.y1+'</span>':'')
-        +(cp.y2!=null?'<span class="pill y"><span class="lbl">복연2</span>'+cp.y2+'</span>':'')
-        +(cp.bh.length?cp.bh.map(function(n){return '<span class="pill dh"><span class="lbl">복병</span>'+n+'</span>';}).join('')
-                      :'<span class="pill nb">복병 없음 · 노트북에서 재예측</span>')
-        +'</div>';
-    } else if(c){               // Claude 예측이 없는 개최 = 옛 방식(모델·시장 순위)로 폴백
-      picks='<div class="picks">'
-        + c.top3.map(function(n){return '<span class="pill top"><span class="lbl">순위</span>'+n+'</span>';}).join('')
-        + c.dh.map(function(n){return '<span class="pill dh"><span class="lbl">4~6위</span>'+n+'</span>';}).join('')+'</div>';
-    }
-    return warn+picks;
-  }
-
-  // ⚙️ 순위 비중 조절 패널
-  function weightPanelHtml(){
-    if(!showW) return '';
-    var t=WEIGHTS.m+WEIGHTS.p+WEIGHTS.w; if(t<=0)t=1;
-    function rw(k,lab){ var v=WEIGHTS[k];
-      return '<div class="wrow"><span class="wlab">'+lab+'</span><input type="range" min="0" max="100" step="1" value="'+v+'" data-wk="'+k+'"><span class="wval" id="wv-'+k+'">'+Math.round(v/t*100)+'%</span></div>'; }
-    return '<div class="wpanel"><div class="wtit">순위 비중 조절 <span class="wsub">드래그하면 순위에 바로 반영·저장</span></div>'
-      +rw('m','모델')+rw('p','연승')+rw('w','단승')
-      +'<button class="btn ghost sm" id="wreset" style="margin-top:8px">기본값 (모델30·연승62·단승8)</button></div>';
+  function summaryHtml(cp){
+    if(!(cp && cp.ax!=null)) return '<div class="warn-line sw-none">이 경주는 노트북 예측이 없습니다 — 아래는 전략점수 순입니다</div>';
+    return '<div class="picks">'
+      +'<span class="pill top"><span class="lbl">축</span>'+cp.ax+'</span>'
+      +(cp.y1!=null?'<span class="pill y"><span class="lbl">복연1</span>'+cp.y1+'</span>':'')
+      +(cp.y2!=null?'<span class="pill y"><span class="lbl">복연2</span>'+cp.y2+'</span>':'')
+      +(cp.bh.length?cp.bh.map(function(n){return '<span class="pill dh"><span class="lbl">복병</span>'+n+'</span>';}).join('')
+                    :'<span class="pill nb">복병 없음 · 노트북에서 재예측</span>')
+      +'</div>';
   }
 
   function render(){
     if(!CUR){ renderHome(); return; }
     var races=CUR.races||[]; if(!races.length){ renderHome(); return; }
     if(page<0)page=0; if(page>=races.length)page=races.length-1;
-    var race=races[page], c=compute(race);
+    var race=races[page];
     var finRank={}; (race.fin||[]).forEach(function(n,i){ if(i<3) finRank[n]=i+1; });
-    // 행 강조 = Claude 픽(축·복연1·복연2 / 복병). 예측이 안 온 개최는 옛 방식(모델·시장 순위)으로 폴백.
+    // 행 강조 = Claude 픽(축·복연1·복연2 / 복병). 예측이 안 온 경주는 강조 없이 점수 순만 표시.
     var cp=cpicks(race), tset={}, dset={}, pkLab={};
     if(cp.ax!=null){
       tset[cp.ax]=1; pkLab[cp.ax]=['축','ax'];
       if(cp.y1!=null){ tset[cp.y1]=1; pkLab[cp.y1]=['복연1','y']; }
       if(cp.y2!=null){ tset[cp.y2]=1; pkLab[cp.y2]=['복연2','y']; }
       cp.bh.forEach(function(n){ dset[n]=1; pkLab[n]=['복병','bh']; });
-    } else {
-      ((c&&c.top3)||[]).forEach(function(n){tset[n]=1;});
-      ((c&&c.dh)||[]).forEach(function(n){dset[n]=1;});
     }
-    var od=OD[odKey(race.n)]||{};
-    var horses=race.h.slice().sort(function(a,b){
-      var ra=(c&&c.mprob[a[0]])?c.mprob[a[0]].rank:999, rb=(c&&c.mprob[b[0]])?c.mprob[b[0]].rank:999;
-      return (ra!==rb)?(ra-rb):(b[2]-a[2]);   // 배당 있으면 최종순위, 없으면 모델점수 순
-    });
+    var horses=race.h.slice().sort(function(a,b){ return b[2]-a[2]; });   // 전략점수 순
     var rp=(race.rp10!=null?race.rp10/10:(race.rp!=null?race.rp:null));   // 이 경주 기준 100m 속도(rp10=×10 압축)
-    var rowsHtml=horses.map(function(a){
-      var num=a[0],nm=a[1],sc=a[2], mp=c&&c.mprob[num];
+    var rowsHtml=horses.map(function(a,ri){
+      var num=a[0],nm=a[1],sc=a[2];
       var cls=tset[num]?'top':dset[num]?'dh':'';
       var fin=finRank[num]?'<span class="fin">'+finRank[num]+'착</span>':'';
-      var wv=(od[num]&&od[num].w!=null)?od[num].w:'', pv=(od[num]&&od[num].p!=null)?od[num].p:'';
-      var pct=mp?' '+mp.pct+'%':'';
       // 속도 파싱: a[3]=압축문자열('86'=8.6·'t86'=주행심사·'x85'=다른거리·'n'=기록없음) / 하위호환(옛 숫자+a[4])
       var pace=null, psrc='', s3=(a.length>3?a[3]:null);
       if(s3!=null){
@@ -448,62 +358,24 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
         else if(psrc==='x') spd=' <b class="spd x">≈'+pace.toFixed(1)+'</b>';
         else spd=' <b class="spd'+(rp!=null?(pace<=rp?' fast':' slow'):'')+'">'+pace.toFixed(1)+'</b>';
       } else if(psrc==='n'){ spd=' <b class="spd none">기록없음</b>'; }
+      // 후반 흐름: a[4]가 숫자 1=🚀 후반 추월(추입·마무리형) / 2=🔻 후반 추월당함(밀림).
+      //  옛 데이터는 a[4]가 문자열(paceSrc)이라 숫자일 때만 읽는다.
+      var sg=(a.length>4&&typeof a[4]==='number')?a[4]:0;
+      var sgb=sg===1?'<span class="sg up" title="후반 상위권 치고 오름(추입·마무리형)">🚀</span>'
+             :sg===2?'<span class="sg dn" title="후반 추월당함(밀림·선행 이탈형)">🔻</span>':'';
       var pl=pkLab[num], pkb=pl?'<span class="pk '+pl[1]+'">'+pl[0]+'</span>':'';
-      return '<div class="row '+cls+'" data-n="'+num+'"><span class="mrk">'+(mp?mp.rank:'')+'</span>'
-        +'<span class="no">'+num+'</span><span class="nm">'+nm+fin+'<small>모델'+sc+spd+'<span class="pctv">'+pct+'</span></small></span>'+pkb
-        +'<span class="odd"><input inputmode="decimal" data-k="w" data-n="'+num+'" value="'+wv+'" placeholder="단"></span>'
-        +'<span class="odd"><input inputmode="decimal" data-k="p" data-n="'+num+'" value="'+pv+'" placeholder="연"></span></div>';
+      return '<div class="row '+cls+'" data-n="'+num+'"><span class="mrk">'+(ri+1)+'</span>'   // 전략점수 순위
+        +'<span class="no">'+num+'</span><span class="nm">'+nm+fin+'<small>모델'+sc+spd+'</small></span>'+sgb+pkb+'</div>';
     }).join('');
     $('#app').innerHTML=
       '<div class="pager"><div class="pg">'+CUR.r+' '+CUR.d+' · '+(page+1)+'/'+races.length+'경주</div>'
-      +'<div class="nav"><button class="btn ghost sm" id="home">≡ 목록</button><button class="btn ghost sm" id="prev">‹</button><button class="btn ghost sm" id="next">›</button><button class="btn ghost sm'+(showW?' on':'')+'" id="wtoggle">⚙️</button></div></div>'
-      +weightPanelHtml()
+      +'<div class="nav"><button class="btn ghost sm" id="home">≡ 목록</button><button class="btn ghost sm" id="prev">‹</button><button class="btn ghost sm" id="next">›</button></div></div>'
       +'<div class="rhead"><b>'+race.n+'R</b><span class="g">'+(race.g||'')+'</span>'+((race.dist||race.bl)?'<span class="d">'+(race.dist?race.dist+'m ':'')+(race.bl||'')+(rp!=null?' · 기준'+rp.toFixed(1):'')+'</span>':'')+'<span class="t">'+(race.tl||'')+'</span></div>'
-      +'<div class="summary">'+summaryHtml(c, cp)+'</div>'
-      +'<div class="oh"><span>단승</span><span>연승</span></div><div class="rows">'+rowsHtml+'</div>';
+      +'<div class="summary">'+summaryHtml(cp)+'</div>'
+      +'<div class="rows">'+rowsHtml+'</div>';
     $('#home').onclick=renderHome;
     $('#prev').onclick=function(){ if(page>0){page--;render();} };
     $('#next').onclick=function(){ if(page<races.length-1){page++;render();} };
-    var wt=$('#wtoggle'); if(wt) wt.onclick=function(){ showW=!showW; render(); };
-    if(showW){
-      Array.prototype.forEach.call(document.querySelectorAll('input[data-wk]'),function(sl){
-        sl.oninput=function(){
-          WEIGHTS[sl.dataset.wk]=+sl.value||0; saveWeights();
-          var t=WEIGHTS.m+WEIGHTS.p+WEIGHTS.w; if(t<=0)t=1;
-          ['m','p','w'].forEach(function(k){ var el=$('#wv-'+k); if(el) el.textContent=Math.round(WEIGHTS[k]/t*100)+'%'; });
-          updateLive(race);
-        };
-        sl.onchange=function(){ render(); };   // 손 떼면 행 순서까지 재정렬
-      });
-      var wr=$('#wreset'); if(wr) wr.onclick=function(){ WEIGHTS={m:30,p:62,w:8}; saveWeights(); render(); };
-    }
-    Array.prototype.forEach.call(document.querySelectorAll('.odd input'),function(inp){
-      inp.addEventListener('input',function(){
-        var n=+inp.dataset.n, k=inp.dataset.k, v=parseFloat(inp.value), id=odKey(race.n);
-        OD[id]=OD[id]||{}; OD[id][n]=OD[id][n]||{}; OD[id][n][k]=(isNaN(v)?null:v);
-        saveState(); updateLive(race);
-      });
-    });
-  }
-
-  function updateLive(race){
-    var c=compute(race), cp=cpicks(race), tset={}, dset={};
-    // Claude 픽(축·복연·복병)은 배당을 넣어도 안 바뀜 → 예측 있으면 그대로, 없으면 옛 방식만 갱신
-    if(cp.ax!=null){
-      tset[cp.ax]=1; if(cp.y1!=null)tset[cp.y1]=1; if(cp.y2!=null)tset[cp.y2]=1;
-      cp.bh.forEach(function(n){dset[n]=1;});
-    } else {
-      ((c&&c.top3)||[]).forEach(function(n){tset[n]=1;});
-      ((c&&c.dh)||[]).forEach(function(n){dset[n]=1;});
-    }
-    var sm=$('.summary'); if(sm) sm.innerHTML=summaryHtml(c, cp);
-    Array.prototype.forEach.call(document.querySelectorAll('.row'),function(row){
-      var n=+row.dataset.n; row.classList.remove('top','dh');
-      if(tset[n])row.classList.add('top'); else if(dset[n])row.classList.add('dh');
-      var mrk=$('.mrk',row); if(mrk) mrk.textContent=(c&&c.mprob[n])?c.mprob[n].rank:'';
-      var pctv=$('.nm small .pctv',row);   // %만 갱신(속도 <b> 서식 보존)
-      if(pctv){ var mp=c&&c.mprob[n]; pctv.textContent=mp?' '+mp.pct+'%':''; }
-    });
   }
 
   // 저장소가 나중에 비워질 때를 대비해, 창을 떠나기 직전 한 번 더 기록
