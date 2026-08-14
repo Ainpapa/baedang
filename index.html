@@ -52,10 +52,17 @@
   .summary .picks{display:flex;flex-wrap:wrap;gap:6px}
   .pill{font-family:var(--font-mono);font-weight:800;font-size:13px;border-radius:9px;padding:4px 9px;border:1px solid var(--line)}
   .pill.top{background:var(--accent);color:#1a1206;border-color:transparent} .pill.dh{background:var(--dh-bg);color:var(--dh);border-color:var(--dh)}
+  .pill.y{background:transparent;color:var(--accent);border-color:var(--accent)}
+  .pill.nb{background:transparent;color:var(--dim);border-color:var(--line);font-family:var(--font-ui);font-size:10.5px;font-weight:700}
   .pill .lbl{font-family:var(--font-ui);font-size:10px;font-weight:700;opacity:.8;margin-right:3px}
   .rows{display:flex;flex-direction:column;gap:5px}
   .row{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:8px 9px}
   .row.top{border-color:var(--accent);background:linear-gradient(0deg,var(--accent-soft),transparent)} .row.dh{border-color:var(--dh)}
+  /* Claude 픽 배지 — 축·복연1·복연2(추천 3두) / 복병(3착점수 4~9위에서 고른 2두) */
+  .row .pk{flex:none;font-size:10px;font-weight:800;border-radius:6px;padding:2px 6px;white-space:nowrap;font-family:var(--font-ui)}
+  .row .pk.ax{background:var(--accent);color:#1a1206}
+  .row .pk.y{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  .row .pk.bh{background:var(--dh-bg);color:var(--dh);border:1px solid var(--dh)}
   .row .mrk{min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;border-radius:6px;background:var(--card-2);color:var(--muted);font-family:var(--font-mono)}
   .row.top .mrk{background:var(--accent);color:#1a1206} .row.dh .mrk{background:var(--dh);color:#fff}
   .row .no{min-width:20px;text-align:center;font-family:var(--font-mono);font-weight:800;color:var(--accent)}
@@ -82,7 +89,7 @@
 <div class="wrap">
   <header><h1>배당반영</h1><span class="tag">경마 · 폰</span></header>
   <div id="app"></div>
-  <p class="foot">노트북 전략점수 → <b>📱 폰으로 전송</b>의 <b>링크</b>를 카톡으로 옮겨 탭하면, 그날 경주가 폰으로 들어옵니다 · 검증 557경주: 시장 top-3 삼복 11.3% · 복병 시장 4·5·6위 포착 93%</p>
+  <p class="foot">노트북 전략점수 → <b>📱 폰으로 전송</b>의 <b>링크</b>를 카톡으로 옮겨 탭하면, 그날 경주가 폰으로 들어옵니다 · <b>축·복연1·복연2</b>=노트북 Claude 추천 3두 · <b>복병</b>=Claude가 3착점수 4~9위에서 고른 2두(실측 706경주: 실제 3착마의 49.6%가 4위 이하 출신)</p>
 </div>
 
 <script>
@@ -273,6 +280,13 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     var sd=Math.sqrt(pres.reduce(function(s,v){return s+(v-mean)*(v-mean);},0)/pres.length);
     return vals.map(function(v){ return (v==null||!sd)?0:(v-mean)/sd; });
   }
+  // Claude 픽(축·복연1·복연2 + 복병 2두) — 노트북 예측 결과. 배당 입력 여부와 무관하게 항상 표시.
+  function cpicks(race){
+    var p=(race&&race.p)||[], b=(race&&race.bh)||[];
+    var n=function(x){ return (x!=null&&x!=='')?Number(x):null; };
+    return {ax:n(p[0]), y1:n(p[1]), y2:n(p[2]),
+            bh:b.map(n).filter(function(x){return x!=null;})};
+  }
   function compute(race){
     var od=OD[odKey(race.n)]||{}, H=race.h;
     var pCnt=0,wCnt=0;
@@ -314,13 +328,24 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     }
     return {mprob:mprob,top3:top3,dh:dh,dis:dis};
   }
-  function summaryHtml(c){
+  function summaryHtml(c, cp){
     var warn = c&&c.dis
       ? '<div class="warn-line sw-'+c.dis.lv+'">'+({ok:'✅ 일치',warn:'⚠️ 주의',danger:'⛔ 경고'}[c.dis.lv])+' · '+c.dis.msg+'</div>'
       : '<div class="warn-line sw-none">연승·단승 배당을 입력하면 순위가 재배치됩니다 (연승 주력 + 모델 보정)</div>';
-    var picks = c ? '<div class="picks">'
-      + c.top3.map(function(n){return '<span class="pill top"><span class="lbl">추천</span>'+n+'</span>';}).join('')
-      + c.dh.map(function(n){return '<span class="pill dh"><span class="lbl">복병</span>'+n+'</span>';}).join('')+'</div>' : '';
+    var picks='';
+    if(cp && cp.ax!=null){      // Claude 예측이 같이 온 경주 = 추천 3두 + 복병(배당 없어도 항상 표시)
+      picks='<div class="picks">'
+        +'<span class="pill top"><span class="lbl">축</span>'+cp.ax+'</span>'
+        +(cp.y1!=null?'<span class="pill y"><span class="lbl">복연1</span>'+cp.y1+'</span>':'')
+        +(cp.y2!=null?'<span class="pill y"><span class="lbl">복연2</span>'+cp.y2+'</span>':'')
+        +(cp.bh.length?cp.bh.map(function(n){return '<span class="pill dh"><span class="lbl">복병</span>'+n+'</span>';}).join('')
+                      :'<span class="pill nb">복병 없음 · 노트북에서 재예측</span>')
+        +'</div>';
+    } else if(c){               // Claude 예측이 없는 개최 = 옛 방식(모델·시장 순위)로 폴백
+      picks='<div class="picks">'
+        + c.top3.map(function(n){return '<span class="pill top"><span class="lbl">순위</span>'+n+'</span>';}).join('')
+        + c.dh.map(function(n){return '<span class="pill dh"><span class="lbl">4~6위</span>'+n+'</span>';}).join('')+'</div>';
+    }
     return warn+picks;
   }
 
@@ -341,8 +366,17 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     if(page<0)page=0; if(page>=races.length)page=races.length-1;
     var race=races[page], c=compute(race);
     var finRank={}; (race.fin||[]).forEach(function(n,i){ if(i<3) finRank[n]=i+1; });
-    var top3=(c&&c.top3)||[], dh=(c&&c.dh)||[], tset={}, dset={};
-    top3.forEach(function(n){tset[n]=1;}); dh.forEach(function(n){dset[n]=1;});
+    // 행 강조 = Claude 픽(축·복연1·복연2 / 복병). 예측이 안 온 개최는 옛 방식(모델·시장 순위)으로 폴백.
+    var cp=cpicks(race), tset={}, dset={}, pkLab={};
+    if(cp.ax!=null){
+      tset[cp.ax]=1; pkLab[cp.ax]=['축','ax'];
+      if(cp.y1!=null){ tset[cp.y1]=1; pkLab[cp.y1]=['복연1','y']; }
+      if(cp.y2!=null){ tset[cp.y2]=1; pkLab[cp.y2]=['복연2','y']; }
+      cp.bh.forEach(function(n){ dset[n]=1; pkLab[n]=['복병','bh']; });
+    } else {
+      ((c&&c.top3)||[]).forEach(function(n){tset[n]=1;});
+      ((c&&c.dh)||[]).forEach(function(n){dset[n]=1;});
+    }
     var od=OD[odKey(race.n)]||{};
     var horses=race.h.slice().sort(function(a,b){
       var ra=(c&&c.mprob[a[0]])?c.mprob[a[0]].rank:999, rb=(c&&c.mprob[b[0]])?c.mprob[b[0]].rank:999;
@@ -370,8 +404,9 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
         else if(psrc==='x') spd=' <b class="spd x">≈'+pace.toFixed(1)+'</b>';
         else spd=' <b class="spd'+(rp!=null?(pace<=rp?' fast':' slow'):'')+'">'+pace.toFixed(1)+'</b>';
       } else if(psrc==='n'){ spd=' <b class="spd none">기록없음</b>'; }
+      var pl=pkLab[num], pkb=pl?'<span class="pk '+pl[1]+'">'+pl[0]+'</span>':'';
       return '<div class="row '+cls+'" data-n="'+num+'"><span class="mrk">'+(mp?mp.rank:'')+'</span>'
-        +'<span class="no">'+num+'</span><span class="nm">'+nm+fin+'<small>모델'+sc+spd+'<span class="pctv">'+pct+'</span></small></span>'
+        +'<span class="no">'+num+'</span><span class="nm">'+nm+fin+'<small>모델'+sc+spd+'<span class="pctv">'+pct+'</span></small></span>'+pkb
         +'<span class="odd"><input inputmode="decimal" data-k="w" data-n="'+num+'" value="'+wv+'" placeholder="단"></span>'
         +'<span class="odd"><input inputmode="decimal" data-k="p" data-n="'+num+'" value="'+pv+'" placeholder="연"></span></div>';
     }).join('');
@@ -380,7 +415,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       +'<div class="nav"><button class="btn ghost sm" id="home">≡ 목록</button><button class="btn ghost sm" id="prev">‹</button><button class="btn ghost sm" id="next">›</button><button class="btn ghost sm'+(showW?' on':'')+'" id="wtoggle">⚙️</button></div></div>'
       +weightPanelHtml()
       +'<div class="rhead"><b>'+race.n+'R</b><span class="g">'+(race.g||'')+'</span>'+((race.dist||race.bl)?'<span class="d">'+(race.dist?race.dist+'m ':'')+(race.bl||'')+(rp!=null?' · 기준'+rp.toFixed(1):'')+'</span>':'')+'<span class="t">'+(race.tl||'')+'</span></div>'
-      +'<div class="summary">'+summaryHtml(c)+'</div>'
+      +'<div class="summary">'+summaryHtml(c, cp)+'</div>'
       +'<div class="oh"><span>단승</span><span>연승</span></div><div class="rows">'+rowsHtml+'</div>';
     $('#home').onclick=renderHome;
     $('#prev').onclick=function(){ if(page>0){page--;render();} };
@@ -408,9 +443,16 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   }
 
   function updateLive(race){
-    var c=compute(race), top3=(c&&c.top3)||[], dh=(c&&c.dh)||[], tset={}, dset={};
-    top3.forEach(function(n){tset[n]=1;}); dh.forEach(function(n){dset[n]=1;});
-    var sm=$('.summary'); if(sm) sm.innerHTML=summaryHtml(c);
+    var c=compute(race), cp=cpicks(race), tset={}, dset={};
+    // Claude 픽(축·복연·복병)은 배당을 넣어도 안 바뀜 → 예측 있으면 그대로, 없으면 옛 방식만 갱신
+    if(cp.ax!=null){
+      tset[cp.ax]=1; if(cp.y1!=null)tset[cp.y1]=1; if(cp.y2!=null)tset[cp.y2]=1;
+      cp.bh.forEach(function(n){dset[n]=1;});
+    } else {
+      ((c&&c.top3)||[]).forEach(function(n){tset[n]=1;});
+      ((c&&c.dh)||[]).forEach(function(n){dset[n]=1;});
+    }
+    var sm=$('.summary'); if(sm) sm.innerHTML=summaryHtml(c, cp);
     Array.prototype.forEach.call(document.querySelectorAll('.row'),function(row){
       var n=+row.dataset.n; row.classList.remove('top','dh');
       if(tset[n])row.classList.add('top'); else if(dset[n])row.classList.add('dh');
